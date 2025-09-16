@@ -14,7 +14,8 @@
     "dev": "nodemon --watch src --exec node src/index.js",
     "migrate": "node scripts/run-migrations.js up",
     "migrate:rollback": "node scripts/run-migrations.js down",
-    "lint": "eslint . --ext .js"
+    "lint": "eslint . --ext .js",
+    "build": "echo 'No build needed'"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
