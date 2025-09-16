@@ -1,48 +1,43 @@
 import { useState, useEffect } from "react";
 import { Modal } from "../../components/shared/Modal";
+import { Trash2, Plus } from "lucide-react";
 import api from "../../utils/api";
 import { toast } from "react-toastify";
-import { fetchElections } from "../../utils/utils";
+import InlineLoader from '../../components/shared/InlineLoader';
+import TableEmptyState from '../../components/shared/TableEmptyState';
 
 // Polling Agents Management Component
 export function PollingAgentsManagement() {
   const [agents, setAgents] = useState([]);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [elections, setElections] = useState([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [selectedAgent, setSelectedAgent] = useState(null);
   const [newAgent, setNewAgent] = useState({
-    email: "",
+    username: "",
     role: "polling_agent",
-    election: "",
+    email: "",
     password: "",
   });
-
-  const BASE_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
     const loadAgents = async () => {
       try {
-        const res = await api.get(`api/auth/users/`);
+        setLoading(true);
+        const res = await api.get(`admin/polling_agent/`);
         if (res.status === 200) {
-          console.log("Fetched agents:", res.data);
-          setAgents(res.data.results);
+          setAgents(res.data.results || []);
         }
       } catch (err) {
         console.error("Error fetching agents:", err);
         toast.error("Failed to load agents");
       }
-    };
-    const loadElections = async () => {
-      try {
-        const elections = await fetchElections(BASE_URL);
-        setElections(elections);
-      } catch (err) {
-        console.error("Error fetching elections:", err);
-      }
+      finally { setLoading(false); }
     };
 
     loadAgents();
-    loadElections();
-  }, [BASE_URL]);
+  }, []);
+
+  const [loading, setLoading] = useState(false);
 
   const generatePassword = () => {
     const chars =
@@ -57,51 +52,45 @@ export function PollingAgentsManagement() {
   const createAgent = async (e) => {
     e.preventDefault();
     try {
-      const response = await api.post(`${BASE_URL}api/auth/users/`, newAgent);
+      const response = await api.post("admin/polling_agent", newAgent);
 
       if (response.status === 201 || response.status === 200) {
         toast.success("Polling agent created successfully");
-
-        // ✅ Add new agent to the list so UI updates immediately
         setAgents((prev) => [...prev, response.data]);
-
         setNewAgent({
-          email: "",
+          username: "",
           role: "polling_agent",
-          election: "",
+          email: "",
           password: "",
         });
         setShowCreateForm(false);
       } else {
         toast.error("Failed to create agent");
       }
-    } catch (error) {
+    } catch {
       toast.error("Error creating agent");
-      console.error(error);
     }
   };
 
-  const deleteAgent = (agentId) => {
-    if (
-      window.confirm(
-        "Are you sure you want to delete this agent? This action cannot be undone."
-      )
-    ) {
-      setAgents(agents.filter((agent) => agent.id !== agentId));
-    }
+  const handleDeleteAgent = (agent) => {
+    setSelectedAgent(agent);
+    setShowDeleteConfirm(true);
   };
 
-  const deactivateAgent = (agentId) => {
-    setAgents(
-      agents.map((agent) =>
-        agent.id === agentId
-          ? {
-              ...agent,
-              status: agent.status === "active" ? "inactive" : "active",
-            }
-          : agent
-      )
-    );
+  const confirmDelete = async () => {
+    try {
+      const res = await api.delete(`admin/polling_agent/${selectedAgent.id}`);
+      if (res.status === 200 || res.status === 204) {
+        toast.success("Agent deleted successfully");
+        setAgents((prev) => prev.filter((agent) => agent.id !== selectedAgent.id));
+      } else {
+        toast.error("Failed to delete agent");
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Error deleting agent");
+    }
+    setShowDeleteConfirm(false);
+    setSelectedAgent(null);
   };
 
   return (
@@ -112,12 +101,14 @@ export function PollingAgentsManagement() {
         </h2>
         <button
           onClick={() => setShowCreateForm(true)}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-500"
+          className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-500 flex items-center space-x-2"
         >
-          Create New Agent
+          <Plus size={16} />
+          <span>Create New Agent</span>
         </button>
       </div>
 
+      {/* Create Agent Modal */}
       {showCreateForm && (
         <Modal
           isOpen={showCreateForm}
@@ -127,42 +118,35 @@ export function PollingAgentsManagement() {
           <div className="bg-white p-6">
             <h3 className="text-lg font-medium mb-4">Create Polling Agent</h3>
             <form onSubmit={createAgent} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Agent Email
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={newAgent.email}
-                    onChange={(e) =>
-                      setNewAgent({ ...newAgent, email: e.target.value })
-                    }
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                    placeholder="Enter agent email"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">
-                    Assign to Election
-                  </label>
-                  <select
-                    value={newAgent.election}
-                    onChange={(e) =>
-                      setNewAgent({ ...newAgent, election: e.target.value })
-                    }
-                    className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
-                    required
-                  >
-                    <option value="">-- Select Election --</option>
-                    {elections.map((election) => (
-                      <option key={election.id} value={election.id}>
-                        {election.title}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newAgent.username}
+                  onChange={(e) =>
+                    setNewAgent({ ...newAgent, username: e.target.value })
+                  }
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="Enter agent username"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={newAgent.email}
+                  onChange={(e) =>
+                    setNewAgent({ ...newAgent, email: e.target.value })
+                  }
+                  className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2"
+                  placeholder="Enter agent email"
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700">
@@ -208,21 +192,49 @@ export function PollingAgentsManagement() {
         </Modal>
       )}
 
+      {/* Delete Confirmation Modal */}
+      {showDeleteConfirm && (
+        <Modal
+          isOpen={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          title="Confirm Delete"
+        >
+          <div className="bg-white p-6">
+            <h3 className="text-lg font-medium mb-4">Delete Polling Agent</h3>
+            <p className="text-gray-600 mb-6">
+              Are you sure you want to delete the polling agent "{selectedAgent?.username}"? 
+              This action cannot be undone.
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={confirmDelete}
+                className="bg-red-600 text-white px-4 py-2 rounded-md text-sm hover:bg-red-700"
+              >
+                Delete
+              </button>
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                className="bg-gray-300 text-gray-700 px-4 py-2 rounded-md text-sm hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
       <div className="bg-white shadow rounded-lg">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Agent Name
+                Agent Username
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Polling Station
+                Email
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Password
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
+                Role
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Actions
@@ -230,45 +242,39 @@ export function PollingAgentsManagement() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {agents &&
-              agents.map((agent) => (
+            {loading ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center">
+                  <InlineLoader message="Loading agents…" />
+                </td>
+              </tr>
+            ) : agents.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-6 py-8 text-center">
+                  <TableEmptyState message="No polling agents found" suggestion="Create a polling agent to get started" />
+                </td>
+              </tr>
+            ) : agents.map((agent) => (
                 <tr key={agent.id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {agent.name || agent.email}
+                    {agent.username}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {agent.station || "—"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                    {agent.password}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 py-1 text-xs rounded-full ${
-                        agent.status === "active"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {agent.status}
-                    </span>
+                    {agent.email}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <button className="text-indigo-600 hover:text-indigo-900 mr-3">
-                      Reset Password
-                    </button>
-                    <button
-                      onClick={() => deactivateAgent(agent.id)}
-                      className="text-yellow-600 hover:text-yellow-900 mr-3"
-                    >
-                      {agent.status === "active" ? "Deactivate" : "Activate"}
-                    </button>
-                    <button
-                      onClick={() => deleteAgent(agent.id)}
-                      className="text-red-600 hover:text-red-900"
-                    >
-                      Delete
-                    </button>
+                    {agent.role}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div className="flex justify-center">
+                      <button
+                        onClick={() => handleDeleteAgent(agent)}
+                        className="text-red-600 hover:text-red-900 p-1 hover:bg-red-50 rounded transition-colors"
+                        title="Delete Agent"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

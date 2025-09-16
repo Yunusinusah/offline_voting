@@ -1,1 +1,111 @@
 @import "tailwindcss";
+
+.hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+    display: none;
+}
+
+/* Custom Color Classes - Replace Tailwind Custom Colors */
+.bg-primary-50 { background-color: #f0f9ff; }
+.bg-primary-100 { background-color: #e0f2fe; }
+.bg-primary-200 { background-color: #bae6fd; }
+.bg-primary-300 { background-color: #7dd3fc; }
+.bg-primary-400 { background-color: #38bdf8; }
+.bg-primary-500 { background-color: #0ea5e9; }
+.bg-primary-600 { background-color: #0284c7; }
+.bg-primary-700 { background-color: #0369a1; }
+.bg-primary-800 { background-color: #075985; }
+.bg-primary-900 { background-color: #0c4a6e; }
+
+.text-primary-50 { color: #f0f9ff; }
+.text-primary-100 { color: #e0f2fe; }
+.text-primary-200 { color: #bae6fd; }
+.text-primary-300 { color: #7dd3fc; }
+.text-primary-400 { color: #38bdf8; }
+.text-primary-500 { color: #0ea5e9; }
+.text-primary-600 { color: #0284c7; }
+.text-primary-700 { color: #0369a1; }
+.text-primary-800 { color: #075985; }
+.text-primary-900 { color: #0c4a6e; }
+
+.border-primary-100 { border-color: #e0f2fe; }
+.border-primary-200 { border-color: #bae6fd; }
+.border-primary-500 { border-color: #0ea5e9; }
+.border-primary-600 { border-color: #0284c7; }
+
+.bg-secondary-50 { background-color: #faf6ff; }
+.bg-secondary-100 { background-color: #f3e8ff; }
+.bg-secondary-200 { background-color: #e9d5ff; }
+.bg-secondary-300 { background-color: #d8b4fe; }
+.bg-secondary-400 { background-color: #c084fc; }
+.bg-secondary-500 { background-color: #a855f7; }
+.bg-secondary-600 { background-color: #9333ea; }
+.bg-secondary-700 { background-color: #7c3aed; }
+.bg-secondary-800 { background-color: #6b21a8; }
+.bg-secondary-900 { background-color: #581c87; }
+
+.text-secondary-50 { color: #faf6ff; }
+.text-secondary-100 { color: #f3e8ff; }
+.text-secondary-200 { color: #e9d5ff; }
+.text-secondary-300 { color: #d8b4fe; }
+.text-secondary-400 { color: #c084fc; }
+.text-secondary-500 { color: #a855f7; }
+.text-secondary-600 { color: #9333ea; }
+.text-secondary-700 { color: #7c3aed; }
+.text-secondary-800 { color: #6b21a8; }
+.text-secondary-900 { color: #581c87; }
+
+/* Gradient Backgrounds */
+.bg-gradient-primary {
+  background: linear-gradient(to right, #0ea5e9, #0284c7);
+}
+
+.bg-gradient-sidebar-item {
+  background: linear-gradient(to right, #f0f9ff, #e0f2fe);
+}
+
+/* Hover States */
+.hover\:bg-primary-50:hover { background-color: #f0f9ff; }
+.hover\:text-primary-600:hover { color: #0284c7; }
+.hover\:text-primary-700:hover { color: #0369a1; }
+.hover\:bg-gray-50:hover { background-color: #f9fafb; }
+.hover\:bg-gray-100:hover { background-color: #f3f4f6; }
+
+/* Focus States */
+.focus\:ring-primary-500:focus {
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.5);
+}
+
+/* Custom Utilities */
+.backdrop-blur-md {
+  backdrop-filter: blur(12px);
+}
+
+.backdrop-blur-sm {
+  backdrop-filter: blur(4px);
+}
+
+/* You'll need to add these to your existing component */
+.bg-white-80 {
+  background-color: rgba(255, 255, 255, 0.8);
+}
+
+.bg-gray-50-50 {
+  background-color: rgba(249, 250, 251, 0.5);
+}
+
+.bg-primary-50-50 {
+  background-color: rgba(240, 249, 255, 0.5);
+}
+
+.border-gray-200-60 {
+  border-color: rgba(229, 231, 235, 0.6);
+}
+
+.border-gray-200-30 {
+  border-color: rgba(229, 231, 235, 0.3);
+}

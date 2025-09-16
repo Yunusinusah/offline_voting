@@ -1,0 +1,501 @@
+Election Backend API Documentation
+
+Base URL: http://<HOST>[:PORT]
+
+Notes:
+- All endpoints below are relative to the Base URL.
+- Authentication uses JSON Web Tokens (JWT) in the Authorization header: `Authorization: Bearer <token>`.
+- Admin/agent tokens are issued by `POST /auth/admin/login` (expires in ~8 hours).
+- Voter tokens are issued by `POST /auth/voter/verify` after OTP verification (expires in ~2 hours).
+- Endpoints that accept file uploads use multipart/form-data.
+
+---
+
+Quick checklist (requirements extracted from code):
+- Document all routes in `src/routes` and their controllers. [Done]
+- Include method, path, auth requirements, request body/fields, file fields, and example responses. [Done]
+- Explain OTP flow and tokens. [Done]
+- Describe Excel upload format for voters. [Done]
+- Describe vote payload shape and server-side validation rules (max votes, under/over-voting, skip votes). [Done]
+
+---
+
+Common HTTP status codes used by this API
+- 200 OK: Successful GET/POST that returns data.
+- 201 Created: Resource created.
+- 400 Bad Request: Validation error or malformed input.
+- 401 Unauthorized: Missing/invalid token or missing auth header.
+- 403 Forbidden: Authenticated but not allowed for the action.
+- 404 Not Found: Resource not found.
+- 500 Internal Server Error: Unexpected failure.
+
+---
+
+## Authentication
+
+### POST /auth/admin/login
+- Purpose: Admin/polling agent login using username and password.
+- Auth: none
+- Request (application/json):
+  - username: string (required)
+  - password: string (required)
+- Response 200 (application/json):
+  - token: string (JWT)
+  - role: string (user role, e.g., "admin", "polling_agent", "superadmin")
+- Response 401: { error: 'invalid credentials' }
+- Notes: Token expires in ~8 hours.
+
+Example request:
+{ "username": "admin1", "password": "secret" }
+
+Example success response:
+{ "token": "<jwt>", "role": "admin" }
+
+
+### POST /auth/voter/generate
+- Purpose: Generate a one-time PIN (OTP) for a voter. Intended to be called by a polling agent or admin.
+- Auth: Required (Bearer JWT) + role must be one of ['polling_agent', 'admin', 'superadmin']
+- Request (application/json):
+  - student_id: string (required)
+- Response 200 (application/json):
+  - otp: string (the numeric code - returned so polling agent can show it) 
+  - expires_at: ISO8601 timestamp
+- Response 404: { error: 'voter not found' }
+- Response 401/403: as per middleware
+- Notes: OTP TTL default is 10 minutes; code is recorded in `otps` table. The implementation returns the code in the response for offline/display use by polling agents.
+
+Example request:
+{ "student_id": "S12345" }
+
+Example success response:
+{ "otp": "012345", "expires_at": "2025-08-31T12:34:56.000Z" }
+
+
+### POST /auth/voter/verify
+- Purpose: Verify an OTP for a voter and receive a voter JWT.
+- Auth: none
+- Request (application/json):
+  - student_id: string (required)
+  - code: string (required)
+- Response 200 (application/json):
+  - token: string (JWT with { voterId, role: 'voter' })
+- Response 400: { error: 'invalid or expired code' }
+- Response 404: { error: 'voter not found' }
+- Notes: Token expires in ~2 hours.
+
+Example request:
+{ "student_id": "S12345", "code": "012345" }
+
+Example success response:
+{ "token": "<voter-jwt>" }
+
+---
+
+## Health
+
+### GET /health
+- Purpose: Simple healthcheck
+- Auth: none
+- Response 200 (application/json):
+  - ok: true
+  - time: ISO timestamp
+
+Example response:
+{ "ok": true, "time": "2025-08-31T12:00:00.000Z" }
+
+---
+
+## Departments
+
+### POST /departments
+- Purpose: Create a department (with optional logo and theme color)
+- Auth: none in code (public). If you want to restrict it, add middleware.
+- Content-Type: multipart/form-data
+- Fields:
+  - name: string (required)
+  - theme_color: string (optional, e.g., '#ff0000')
+  - logo: file (form field name: 'logo') (optional)
+- Response 201 (application/json): created department
+  - id, name, logo_path, theme_color
+- Response 500: { error: 'failed to create department', details }
+
+Example response:
+{ "id": 1, "name": "Engineering", "logo_path": "/public/uploads/169352...-logo.png", "theme_color": "#123456" }
+
+### GET /departments/:id
+- Purpose: Retrieve a department
+- Auth: none
+- Response 200: department object (columns from `departments` table)
+- Response 404: { error: 'not found' }
+
+---
+
+## Voters (bulk upload)
+
+### POST /voters/upload
+- Purpose: Upload an Excel file (.xlsx or .xls) containing multiple voters. This route expects a multipart/form-data request with the file field named 'file'.
+- Path: /voters/upload
+- Auth: Required (Bearer JWT) + role in ['admin','polling_agent','superadmin']
+- Content-Type: multipart/form-data
+- Form field:
+  - file: file (Excel .xlsx or .xls)
+- Excel expectations (first sheet):
+  - First row must be headers. Header names are normalized to lowercase and spaces replaced with underscores.
+  - Required column(s): student_id
+  - Optional columns commonly supported: password, level, gender, election_id
+  - Example header row: student_id, password, level, gender, election_id
+
+Processing notes / server behavior:
+- If password cell empty, default password 'changeme' is used and hashed before insert.
+- Rows with missing student_id are skipped and collected as errors.
+- The handler performs upserts: existing voters (by student_id) are updated; new voters are inserted.
+- Returns counts of inserted/updated and summary message.
+
+Response 200 (application/json):
+{
+  success: true,
+  total: <number of processed rows>,
+  inserted: <count>,
+  updated: <count>,
+  message: "Successfully processed X records (Y new, Z updated)"
+}
+
+Response 400 possible bodies:
+- { error: 'Excel file required' }
+- { error: 'Only Excel files (.xlsx, .xls) are allowed' }
+- { error: 'Excel file contains no data rows' }
+- { error: 'Missing required columns: student_id' }
+- { error: 'Validation errors found', errors: [ ... ], totalErrors: N }
+
+Notes for frontend: send file field name = 'file'. Use multipart/form-data. Expect JSON summary on success or structured validation errors.
+
+---
+
+## Votes
+
+### POST /votes
+- Purpose: Cast votes for an election. This is the core voter action.
+- Path: /votes
+- Auth: Required (Bearer JWT with voter role) OR you may supply voterId in body if the server authenticates differently; the code prefers req.user.voterId.
+- Request (application/json):
+  - voterId: integer (optional if JWT contains voterId)
+  - electionId: integer (required)
+  - votes: array (required). Each element is an object with:
+    - portfolio_id: integer (required) - portfolio/position identifier
+    - candidate_id: integer (optional) - id of chosen candidate
+    - skip_vote: boolean (optional) - if set true, counts as a skipped vote for that portfolio
+
+Validation rules enforced server-side (important for frontend to follow):
+- voter must exist and be registered for the given election (voter.election_id must match)
+- A voter may only cast votes once (the server checks logs table for previous 'cast_vote')
+- Election must exist, be active, and be within start_time/end_time if they are set
+- election.max_votes_per_voter enforces maximum number of non-skip votes allowed
+- election.allow_under_voting controls whether under-voting is permitted (if false and fewer votes provided than max, it's rejected)
+
+Success response 200 (application/json):
+The controller delegates to `voteService.castVote` and returns that result. On success the service typically returns { "ok": true } but may include additional details or errors as provided by the service.
+
+Example request body:
+{
+  "electionId": 5,
+  "votes": [
+    { "portfolio_id": 2, "candidate_id": 15 },
+    { "portfolio_id": 3, "skip_vote": true }
+  ]
+}
+
+Common error responses:
+- 401: { error: 'voter authentication required' }
+- 400: { error: 'votes must be an array' }
+- 400: { error: 'voter not found or not registered for this election' }
+- 400: { error: 'voter has already voted' }
+- 400: { error: 'election not found' }
+- 400: { error: 'election not started' }
+- 400: { error: 'election ended' }
+- 400: { error: 'election not active' }
+- 400: { error: 'over-voting detected' }
+- 400: { error: 'under-voting not allowed for this election' }
+
+Notes: frontend should disable vote re-submission after success and handle server validation messages gracefully.
+
+---
+
+## Results
+
+### GET /results/election/:id
+- Purpose: Fetch tally for a specific election
+- Auth: none (public in code)
+- Response 200 (application/json):
+{
+  electionId: <id>,
+  total_votes: <number>,      // total non-skipped votes
+  skipped_votes: <number>,    // number of skip votes
+  results: [
+    { id, full_name, profile_picture, votes, percentage }
+  ]
+}
+
+Notes: percentage is a string formatted to 2 decimal places; profile_picture is a URL path if present.
+
+Example response:
+{
+  "electionId": 5,
+  "total_votes": 120,
+  "skipped_votes": 8,
+  "results": [ { "id": 1, "full_name": "Alice", "profile_picture": "/public/uploads/..", "votes": 60, "percentage": "50.00" }, ... ]
+}
+
+---
+
+## Admin routes (prefix: /admin)
+
+Note: All admin routes require Bearer JWT Authorization with role in ['admin','superadmin'] as enforced by middleware.
+
+### Elections
+
+#### POST /admin/elections
+- Purpose: Create an election
+- Auth: Bearer token; role = admin|superadmin
+- Request (application/json): fields supported
+  - title: string (required)
+  - start_time: ISO datetime string (optional)
+  - end_time: ISO datetime string (optional)
+  - is_active: boolean (optional)
+  - max_votes_per_voter: integer (optional)
+  - allow_under_voting: boolean (optional)
+- Response 201: the created election object (fields mirror DB table)
+- Response 500: { error }
+
+Note: The controller will coerce `is_active` to boolean, default `max_votes_per_voter` to 1 when missing, and default `allow_under_voting` to true if not provided.
+
+Example request:
+{ "title": "2025 Student Council", "start_time": "2025-09-01T08:00:00Z", "end_time": "2025-09-01T17:00:00Z", "is_active": true, "max_votes_per_voter": 2 }
+
+#### GET /admin/elections
+- Purpose: List all elections
+- Auth: admin|superadmin
+- Response 200: array of election objects
+
+#### GET /admin/elections/:id
+- Purpose: Get a single election
+- Auth: admin|superadmin
+- Response 200: election object
+- Response 404: { error: 'not found' }
+
+#### PUT /admin/elections/:id
+- Purpose: Update an election
+- Auth: admin|superadmin
+- Request (application/json): any updatable fields
+- Response 200: updated election object
+
+#### DELETE /admin/elections/:id
+- Purpose: Delete an election
+- Auth: admin|superadmin
+- Response 200: { ok: true }
+
+
+### Portfolios
+
+#### POST /admin/portfolios
+- Purpose: Create portfolio (position/seat)
+- Auth: admin|superadmin
+- Request (application/json):
+  - name: string (required)
+  - priority: integer (optional)
+  - level: string (optional)
+  - election_id: integer (required)
+- Response 201: created portfolio object
+
+#### GET /admin/portfolios/election/:electionId
+- Purpose: List portfolios for a given election
+- Auth: admin|superadmin
+- Response 200: array of portfolio objects
+
+Note: Portfolios are returned ordered by `priority` ascending.
+
+#### PUT /admin/portfolios/:id
+- Purpose: Update portfolio
+- Auth: admin|superadmin
+- Response 200: updated portfolio object
+
+#### DELETE /admin/portfolios/:id
+- Purpose: Delete portfolio
+- Auth: admin|superadmin
+- Response 200: { ok: true }
+
+
+### Candidates
+
+#### POST /admin/candidates
+- Purpose: Create a candidate. Supports a profile picture upload.
+- Auth: admin|superadmin
+- Content-Type: multipart/form-data
+- Form fields:
+  - portfolio_id: integer (required)
+  - full_name: string (required)
+  - ballot_num: integer (optional)
+  - election_id: integer (required)
+  - profile_picture: file (form field name: 'profile_picture') (optional)
+- Response 201: created candidate object
+
+Note: If a `profile_picture` file is uploaded, the candidate record's `profile_picture` contains a path under `/public/uploads/<filename>`.
+
+Example form fields (multipart/form-data):
+- portfolio_id: 2
+- full_name: "Jane Doe"
+- ballot_num: 3
+- election_id: 5
+- profile_picture: <file>
+
+#### GET /admin/candidates/election/:electionId
+- Purpose: List candidates for an election
+- Auth: admin|superadmin
+- Response 200: array of candidate objects ordered by ballot_num
+
+#### PUT /admin/candidates/:id
+- Purpose: Update a candidate (can include new profile_picture)
+- Auth: admin|superadmin
+- Content-Type: multipart/form-data (if uploading picture)
+- Response 200: updated candidate object
+
+#### DELETE /admin/candidates/:id
+- Purpose: Remove candidate
+- Auth: admin|superadmin
+- Response 200: { ok: true }
+---
+
+### User management (under /admin)
+
+These endpoints let privileged users create other users in the system. All endpoints are mounted under the `/admin` prefix (router is mounted at `/admin`).
+
+#### POST /admin/admin
+- Purpose: Create a new admin user (only `superadmin` may call this)
+- Auth: Bearer JWT; role must be `superadmin`
+- Request (application/json):
+  - username: string (required)
+  - password: string (required)
+  - email: string (optional)
+  - election_id: integer (optional) — associate the admin with a specific election
+- Responses:
+  - 201 Created: { id: <number>, username: <string>, role: 'admin' }
+  - 400 Bad Request: { error: 'username and password required' }
+  - 409 Conflict: { error: 'username already exists' }
+  - 500 Internal Server Error
+
+Notes: The server relies on model hooks to hash passwords before storage. Returns 409 if the username is already taken.
+
+#### POST /admin/polling_agent
+- Purpose: Create a new polling agent user (callable by `admin` or `superadmin`)
+- Auth: Bearer JWT; role must be one of `['admin','superadmin']`
+- Request (application/json):
+  - username: string (required)
+  - password: string (required)
+  - email: string (optional)
+  - election_id: integer (optional)
+- Responses:
+  - 201 Created: { id: <number>, username: <string>, role: 'polling_agent' }
+  - 400 Bad Request: { error: 'username and password required' }
+  - 409 Conflict: { error: 'username already exists' }
+  - 500 Internal Server Error
+
+Notes: Model hooks will hash the password. Use this endpoint to provision polling agents who may generate voter OTPs.
+
+#### POST /admin/voters
+- Purpose: Create a single voter record (callable by `admin` or `superadmin`)
+- Auth: Bearer JWT; role must be one of `['admin','superadmin']`
+- Request (application/json):
+  - student_id: string (required)
+  - password: string (required)
+  - level: string (optional)
+  - gender: string (optional)
+  - election_id: integer (optional)
+- Responses:
+  - 201 Created: { id: <number>, student_id: <string> }
+  - 400 Bad Request: { error: 'student_id and password required' }
+  - 409 Conflict: { error: 'student_id already exists' }
+  - 500 Internal Server Error
+
+Notes: If the provided student_id already exists a 409 will be returned. Hooks on the Voter model will hash the password before saving.
+
+---
+
+## Data shapes (summary)
+These fields are derived from controller insert/selects. Confirm exact DB column names with migrations if necessary.
+
+Election object (example):
+{
+  id: integer,
+  title: string,
+  start_time: string (ISO timestamp) | null,
+  end_time: string (ISO timestamp) | null,
+  is_active: boolean,
+  max_votes_per_voter: integer,
+  allow_under_voting: boolean,
+  created_at: timestamp?,
+  updated_at: timestamp?
+}
+
+Portfolio object:
+{ id, name, priority, level, election_id }
+
+Candidate object:
+{ id, portfolio_id, full_name, profile_picture (url), ballot_num, election_id }
+
+Voter object (sensitive fields omitted when returning to frontend typically):
+{ id, student_id, password (hashed), level, gender, election_id }
+
+Vote record (internal):
+{ id, candidate_id|null, skip_vote: boolean, portfolio_id, election_id }
+
+OTP record (internal):
+{ id, voter_id, code, expires_at, used }
+
+---
+
+## Authorization header
+- All protected routes expect the header:
+  Authorization: Bearer <token>
+- Tokens are plain JWTs signed with server secret. The middleware expects the `role` claim to be present for role checks.
+
+---
+
+## Error handling guidance for frontend
+- Show raw `error` string from server to users only during testing; convert to friendly messages in production.
+- For 400 responses with `errors` array (e.g. from upload), present a summarized view and allow users to download full error details for debugging.
+- Retry policy: do not retry POST /votes on client automatically; ensure user does not double-submit.
+
+---
+
+## Examples (summary)
+1) Admin login
+POST /auth/admin/login
+Request: { "username":"admin","password":"pw" }
+Success: { "token":"<jwt>", "role":"admin" }
+
+2) Polling agent generates OTP for S123
+POST /auth/voter/generate
+Headers: Authorization: Bearer <agent-token>
+Request: { "student_id":"S123" }
+Success: { "otp":"123456", "expires_at":"..." }
+
+3) Voter verifies OTP and obtains token
+POST /auth/voter/verify
+Request: { "student_id":"S123", "code":"123456" }
+Success: { "token":"<voter-jwt>" }
+
+4) Voter casts votes
+POST /votes
+Headers: Authorization: Bearer <voter-jwt>
+Request: { "electionId": 5, "votes": [ { "portfolio_id": 2, "candidate_id": 15 }, { "portfolio_id": 3, "skip_vote": true } ] }
+Success: { "ok": true }
+
+---
+
+## Next steps / recommendations
+- If the frontend needs additional filtering (e.g. candidates by portfolio), consider adding endpoints like `GET /admin/candidates/portfolio/:id`.
+- Consider protecting department creation and results endpoints depending on privacy requirements.
+- Provide a small JSON schema or OpenAPI spec if frontend prefers machine-parsable contracts.
+
+---
+
+Document generated from project source files under `src/routes` and `src/controllers` on 2025-08-31.

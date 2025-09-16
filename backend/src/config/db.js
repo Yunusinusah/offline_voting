@@ -1,4 +1,3 @@
-// provide Sequelize models and instance
 let sequelize = null;
 let models = null;
 try {

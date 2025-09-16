@@ -1,6 +1,6 @@
 import api from "../utils/api";
 
-const STORAGE_KEY = "ovs_auth"; // keep compatibility with existing AuthProvider
+const STORAGE_KEY = "ovs_auth";
 
 function saveAuth({ token, role, user }) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ token, role, user }));
@@ -25,13 +25,13 @@ function getAuth() {
 }
 
 // Admin login -> backend POST /api/auth/admin/login
-export async function loginAdmin({ username, password }) {
-  if (!username || !password) throw new Error("username and password required");
-  const res = await api.post("auth/admin/login", { username, password });
+export async function loginAdmin({ email, password }) {
+  if (!email || !password) throw new Error("email and password required");
+  const res = await api.post("auth/admin/login", { email, password });
   // backend returns { token, role } or similar
   const token = res.data?.token || res.data?.access || null;
   const role = res.data?.role || "admin";
-  const user = { username, role };
+  const user = { email, role };
   if (!token) throw new Error("Invalid server response");
   saveAuth({ token, role, user });
   return { token, role, user };
@@ -60,6 +60,7 @@ export async function generateVoterOTP({ student_id }) {
 
 export function logout() {
   clearAuth();
+  window.location.href = "/";
 }
 
 export function getCurrentUser() {

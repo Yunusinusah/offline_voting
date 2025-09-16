@@ -1,18 +1,26 @@
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'replace_this_secret';
+const { models } = require("../models");
+const JWT_SECRET = process.env.JWT_SECRET || "replace_this_secret";
 
-function authenticate(req, res, next) {
+async function authenticate(req, res, next) {
   const auth = req.headers.authorization;
-  if (!auth) return res.status(401).json({ error: 'missing authorization header' });
-  const parts = auth.split(' ');
-  if (parts.length !== 2 || parts[0] !== 'Bearer') return res.status(401).json({ error: 'invalid authorization header' });
+  if (!auth)
+    return res.status(401).json({ error: "missing authorization header" });
+  const parts = auth.split(" ");
+  if (parts.length !== 2 || parts[0] !== "Bearer")
+    return res.status(401).json({ error: "invalid authorization header" });
   const token = parts[1];
   try {
     const payload = jwt.verify(token, JWT_SECRET);
     req.user = payload;
+    if (payload.role === "voter") {
+      req.full_user = await models.Voter.findByPk(payload.voterId);
+    } else {
+      req.full_user = await models.User.findByPk(payload.userId);
+    }
     return next();
   } catch (err) {
-    return res.status(401).json({ error: 'invalid token' });
+    return res.status(401).json({ error: "invalid token" });
   }
 }
 

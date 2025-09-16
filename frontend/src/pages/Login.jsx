@@ -1,8 +1,8 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import * as auth from "../utils/auth";
-
+const SECRET_WORD = "voter";
 export default function Login() {
   const [formData, setFormData] = useState({
     email: "",
@@ -21,21 +21,11 @@ export default function Login() {
   const handleLogin = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    // setTimeout(() => {
-    //   const voter = {
-    //     user: {
-    //       email: "admin@gmail.com",
-    //       role: formData.password,
-    //     },
-    //     token: "sdjfsd9fsdxj9dxddx9x",
-    //   }
-    //   setUser(voter.user);
-    //   setToken(voter.token);
-    //   navigate(`/vote`)
-    // }, 3000)
-
     try {
-      const { token, role, user } = await auth.loginAdmin({ username: formData.email, password: formData.password });
+      const { token, role, user } = await auth.loginAdmin({
+        email: formData.email,
+        password: formData.password,
+      });
       // auth.loginAdmin already saved token and user to localStorage via saveAuth
       if (!token || !role) {
         toast.error("Invalid server response");
@@ -47,11 +37,11 @@ export default function Login() {
 
       if (role === "admin") navigate("/admin");
       else if (role === "superadmin") navigate("/super-admin");
+      else if (role === "polling_agent") navigate("/generate-password");
       else navigate("/");
 
       toast.success("Login successful");
     } catch (error) {
-      console.error("Login failed:", error.response?.data || error.message);
       toast.error(error.response?.data?.error || error.message || "Invalid credentials or server error");
     } finally {
       setIsLoading(false);
@@ -121,6 +111,11 @@ export default function Login() {
             >
               {isLoading ? "Signing in..." : "Sign in"}
             </button>
+            {formData.email && formData.email.trim() ===  SECRET_WORD ? (
+              <Link to="/" className="text-sm text-indigo-600 hover:underline block text-center">
+                Go to Voter login
+              </Link>
+            ) : null}
           </form>
         </div>
       </div>

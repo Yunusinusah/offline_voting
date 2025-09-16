@@ -7,7 +7,6 @@ export default function PrivateRoute({ allowedRoles }) {
   }
   const user = getUser();
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // Redirect to dashboard or unauthorized page
     return (
       <Navigate
         to={

@@ -9,7 +9,7 @@ function generateCode(length = 6) {
   return String(num).padStart(length, '0');
 }
 
-async function generateOTP(voterId, ttlMinutes = 10) {
+async function generateOTP(voterId, ttlMinutes = 30) {
   const code = generateCode(6);
   const now = new Date();
   const expires = new Date(now.getTime() + ttlMinutes * 60 * 1000);
@@ -28,7 +28,8 @@ async function generateOTP(voterId, ttlMinutes = 10) {
 
 async function verifyOTP(voterId, code) {
   const now = new Date();
-  
+  const utcNow = new Date(now.toUTCString());
+
   if (!models) throw new Error('ORM not initialized');
   
   const otp = await models.Otp.findOne({ 
@@ -37,15 +38,12 @@ async function verifyOTP(voterId, code) {
       code, 
       used: false, 
       expires_at: { 
-        [Op.gt]: now  // Use Op directly from sequelize package
+        [Op.gt]: now
       } 
     } 
   });
-  console.log(otp)
   if (!otp) return false;
 
-  // Do NOT mark OTP as used here. The OTP should be consumed only when the voter casts their vote.
-  // Return the otp record so callers (e.g. auth controller) can include otp id in session/token.
   await models.Log.create({ 
     voter_id: voterId, 
     action: 'verify_otp', 

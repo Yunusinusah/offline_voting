@@ -1,12 +1,19 @@
 import { useState, useEffect } from "react";
 import { Modal } from "../../components/shared/Modal";
+import { Edit, Trash2, Plus } from "lucide-react";
 import api from "../../utils/api";
 import { toast } from "react-toastify";
 import { fetchElections } from "../../utils/utils";
+import { formatDateTime, toInputDateTime } from "../../utils/datetime";
+import StatusBadge from '../../components/shared/StatusBadge';
+import InlineLoader from '../../components/shared/InlineLoader';
+import TableEmptyState from '../../components/shared/TableEmptyState';
+// election status helper used where needed via StatusBadge
 
 // Election Management Component
 export function ElectionManagement() {
   const [elections, setElections] = useState([]);
+  const [loading, setLoading] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [showEditForm, setShowEditForm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -17,6 +24,7 @@ export function ElectionManagement() {
     start_time: "",
     end_time: "",
     is_active: false,
+    max_votes_per_voter: 1,
   });
 
   const [editElection, setEditElection] = useState({
@@ -24,15 +32,33 @@ export function ElectionManagement() {
     start_time: "",
     end_time: "",
     is_active: false,
+
+    max_votes_per_voter: 1,
   });
+
+  useEffect(() => {
+    const loadElections = async () => {
+      try {
+        setLoading(true);
+        const allElections = await fetchElections();
+        setElections(allElections);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadElections();
+  }, []);
+
 
   const handleEdit = (election) => {
     setSelectedElection(election);
     setEditElection({
       title: election.title,
-      start_time: election.start_time,
-      end_time: election.end_time,
+      // convert DB datetime to input-friendly format
+      start_time: toInputDateTime(election.start_time),
+      end_time: toInputDateTime(election.end_time),
       is_active: election.is_active,
+      max_votes_per_voter: election.max_votes_per_voter,
     });
     setShowEditForm(true);
   };
@@ -42,81 +68,69 @@ export function ElectionManagement() {
     setShowDeleteConfirm(true);
   };
 
-  useEffect(() => {
-    const loadElections = async () => {
-      const elections = await fetchElections(BASE_URL);
-      setElections(elections);
-    };
-    loadElections();
-  }, []);
-
   const confirmDelete = async () => {
     try {
       const response = await api.delete(
-        `/api/elections/elections/${selectedElection.id}/`
+        `/admin/elections/${selectedElection.id}/`
       );
       if (response.status === 200 || response.status === 204) {
         toast.success("Election deleted successfully");
+        setElections((prev) =>
+          prev.filter((el) => el.id !== selectedElection.id)
+        );
         setShowDeleteConfirm(false);
         setSelectedElection(null);
-        fetchElections(BASE_URL);
       }
-    } catch (error) {
+    } catch {
       toast.error("Error deleting election");
     }
   };
 
   const handleCreateElection = async (e) => {
     e.preventDefault();
-
     try {
-      const response = await api.post(`/api/elections/elections/`, newElection);
-
+      const response = await api.post(`/admin/elections/`, newElection);
       if (response.status === 201 || response.status === 200) {
         toast.success("Election created successfully");
+        setElections((prev) => [...prev, response.data]); // ✅ add new election instantly
         setNewElection({
           title: "",
           start_time: "",
           end_time: "",
           is_active: false,
+          max_votes_per_voter: 1,
         });
         setShowCreateForm(false);
-        fetchElections(BASE_URL);
-      } else {
-        toast.error("Failed to create election");
       }
-    } catch (error) {
-      toast.error("Error creating election");
-      console.error(error);
+    } catch(error) {
+      toast.error(error.response.data.error || "Error creating election");
     }
   };
 
   const handleUpdateElection = async (e) => {
     e.preventDefault();
-
     try {
       const response = await api.put(
-        `/api/elections/elections/${selectedElection.id}/`,
+        `/admin/elections/${selectedElection.id}/`,
         editElection
       );
-
       if (response.status === 200) {
         toast.success("Election updated successfully");
+        setElections((prev) =>
+          prev.map((el) => (el.id === selectedElection.id ? response.data : el))
+        );
         setEditElection({
           title: "",
           start_time: "",
           end_time: "",
           is_active: false,
+          max_votes_per_voter: 1,
         });
         setShowEditForm(false);
         setSelectedElection(null);
-        fetchElections(BASE_URL);
-      } else {
-        toast.error("Failed to update election");
       }
     } catch (error) {
-      toast.error("Error updating election");
-      console.error(error);
+      toast.error(error.response.data.error || "E rror updating election");
     }
   };
 
@@ -128,12 +142,14 @@ export function ElectionManagement() {
         </h2>
         <button
           onClick={() => setShowCreateForm(true)}
-          className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-500"
+          className="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm hover:bg-indigo-500 flex items-center space-x-2"
         >
-          Create New Election
+          <Plus size={16} />
+          <span>Create New Election</span>
         </button>
       </div>
 
+      {/* Create Election Modal */}
       {showCreateForm && (
         <Modal
           isOpen={showCreateForm}
@@ -194,26 +210,6 @@ export function ElectionManagement() {
                   />
                 </div>
               </div>
-
-              <div>
-                <label className="inline-flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={newElection.is_active}
-                    onChange={(e) =>
-                      setNewElection({
-                        ...newElection,
-                        is_active: e.target.checked,
-                      })
-                    }
-                    className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">
-                    Active Election
-                  </span>
-                </label>
-              </div>
-
               <div className="flex space-x-3">
                 <button
                   type="submit"
@@ -233,6 +229,8 @@ export function ElectionManagement() {
           </div>
         </Modal>
       )}
+
+      {/* Edit Election Modal */}
       {showEditForm && (
         <Modal
           isOpen={showEditForm}
@@ -294,26 +292,6 @@ export function ElectionManagement() {
                 </div>
               </div>
 
-              {/* ✅ Active Checkbox */}
-              <div>
-                <label className="inline-flex items-center">
-                  <input
-                    type="checkbox"
-                    checked={editElection.is_active}
-                    onChange={(e) =>
-                      setEditElection({
-                        ...editElection,
-                        is_active: e.target.checked,
-                      })
-                    }
-                    className="rounded border-gray-300 text-indigo-600 shadow-sm focus:ring-indigo-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">
-                    Active Election
-                  </span>
-                </label>
-              </div>
-
               <div className="flex space-x-3">
                 <button
                   type="submit"
@@ -365,6 +343,7 @@ export function ElectionManagement() {
         </Modal>
       )}
 
+      {/* Elections Table */}
       <div className="bg-white shadow rounded-lg">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -387,42 +366,78 @@ export function ElectionManagement() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {elections &&
-              elections.map((election) => (
+            {loading ? (
+              <tr>
+                <td colSpan={5}>
+                  <InlineLoader message="Loading elections…" />
+                </td>
+              </tr>
+            ) : elections.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-6 py-8 text-center">
+                  <TableEmptyState message="No elections found" suggestion="Create an election to get started" />
+                </td>
+              </tr>
+            ) : null}
+            {elections.map((election) => (
                 <tr key={election.id}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     {election.title}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-2 py-1 text-xs rounded-full ${
-                        election.is_active
-                          ? "bg-green-100 text-green-800"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      {election.is_active ? "Active" : "Inactive"}
-                    </span>
-                  </td>
+                  {(() => {
+                    return (
+                      <>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <StatusBadge election={election} />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDateTime(election.start_time)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDateTime(election.end_time)}
+                        </td>
+                      </>
+                    );
+                  })()}
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {election.start_time}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {election.end_time}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <button
-                      className="text-indigo-600 hover:text-indigo-900 mr-3"
-                      onClick={() => handleEdit(election)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      className="text-red-600 hover:text-red-900"
-                      onClick={() => handleDelete(election)}
-                    >
-                      Delete
-                    </button>
+                    <div className="flex space-x-3">
+                      <button
+                        className={`p-1 hover:bg-indigo-50 rounded transition-colors ${
+                          election.is_active
+                            ? "opacity-50 cursor-not-allowed text-gray-400"
+                            : "text-indigo-600 hover:text-indigo-900"
+                        }`}
+                        onClick={() =>
+                          !election.is_active && handleEdit(election)
+                        }
+                        disabled={election.is_active}
+                        title={
+                          election.is_active
+                            ? "Cannot edit active election"
+                            : "Edit Election"
+                        }
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        className={`p-1 hover:bg-red-50 rounded transition-colors ${
+                          election.is_active
+                            ? "opacity-50 cursor-not-allowed text-gray-400"
+                            : "text-red-600 hover:text-red-900"
+                        }`}
+                        onClick={() =>
+                          !election.is_active && handleDelete(election)
+                        }
+                        disabled={election.is_active}
+                        title={
+                          election.is_active
+                            ? "Cannot delete active election"
+                            : "Delete Election"
+                        }
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -1,16 +1,12 @@
-"use client"
-
-import { useState, useEffect } from "react"
-import { NavLink, Outlet, useNavigate } from "react-router-dom"
+import { useState } from "react"
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom"
 import { 
   LogOut, 
   Clock, 
   Settings, 
   Users, 
   UserCheck, 
-  BarChart3, 
   Monitor, 
-  Printer,
   Shield,
   Bell,
   ChevronDown,
@@ -20,23 +16,17 @@ import {
 import { logout } from "../../utils/auth"
 
 export default function AdminDashboard() {
-  const [timeWarning, setTimeWarning] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [notificationOpen, setNotificationOpen] = useState(false)
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false)
   const navigate = useNavigate()
+  const location = useLocation()
 
   const handleLogout = () => {
     logout();
     navigate("/admin/login");
   }
 
-  // Simulate time warning for demonstration
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setTimeWarning(true)
-    }, 2000) // Show warning after 2 seconds for demo
-    return () => clearTimeout(timer)
-  }, [])
 
   const navItems = [
     { id: "elections", label: "Election Config", href: "/admin", icon: Settings },
@@ -44,115 +34,268 @@ export default function AdminDashboard() {
     { id: "agents", label: "Polling Agents", href: "/admin/polling-agents-management", icon: UserCheck },
     { id: "time", label: "Time Adjustment", href: "/admin/time-adjustment", icon: Clock },
     { id: "monitoring", label: "Live Monitoring", href: "/admin/live-monitoring", icon: Monitor },
-    { id: "results", label: "Results & Printing", href: "/admin/results-and-printing", icon: Printer },
   ]
 
+  const notifications = [
+    {
+      id: 1,
+      title: "New voter registration",
+      time: "5 minutes ago",
+      read: false,
+    },
+    {
+      id: 2,
+      title: "Polling agent assigned",
+      time: "12 minutes ago",
+      read: false,
+    },
+    {
+      id: 3,
+      title: "System status update",
+      time: "1 hour ago",
+      read: true,
+    },
+  ]
+
+  const unreadNotifications = notifications.filter(notification => !notification.read).length;
+
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* Desktop Sidebar - Fixed */}
-      <aside className="hidden md:flex md:flex-shrink-0">
-        <div className="w-64 bg-white border-r border-gray-200 flex flex-col fixed h-full">
-          {/* Logo/Site Header */}
-          <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 flex flex-col">
+      <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/60 sticky top-0 z-40 shadow-sm">
+        <div className="px-5 sm:px-6">
+          <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Shield className="h-8 w-8 text-indigo-600" />
-              <h1 className="ml-2 text-xl font-semibold text-gray-900">Admin Dashboard</h1>
+              <button
+                className="md:hidden p-2 rounded-lg text-gray-500 hover:text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 mr-2 transition-all duration-200"
+                onClick={() => setMobileMenuOpen(true)}
+                aria-label="Open menu"
+              >
+                <Menu size={20} />
+              </button>
+              <div className="flex items-center">
+                <div className="p-2 bg-gradient-primary rounded-lg shadow">
+                  <Shield className="h-6 w-6 text-white" />
+                </div>
+                <h1 className="ml-3 text-xl font-bold text-gray-900">
+                  Admin Dashboard
+                </h1>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <span className="status-indicator md:hidden">
+                <span className="status-dot"></span>
+                Online
+              </span>
+
+              <div className="relative">
+                <button
+                  onClick={() => setNotificationOpen(!notificationOpen)}
+                  className="p-2.5 rounded-xl text-gray-500 hover:text-primary-600 hover:bg-primary-50 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2 relative transition-all duration-200"
+                  aria-label="Notifications"
+                >
+                  <Bell size={20} />
+                  {unreadNotifications > 0 && (
+                    <span className="absolute top-1.5 right-1.5 w-4 h-4 bg-red-500 rounded-full text-xs text-white flex items-center justify-center">
+                      {unreadNotifications}
+                    </span>
+                  )}
+                </button>
+
+                {notificationOpen && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-200/60 backdrop-blur-md">
+                    <div className="px-4 py-3 border-b border-gray-200/50 flex justify-between items-center">
+                      <h3 className="text-sm font-semibold text-gray-900">
+                        Notifications
+                      </h3>
+                      <button
+                        onClick={() => setNotificationOpen(false)}
+                        className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors"
+                        aria-label="Close notifications"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto">
+                      {notifications.map((notification) => (
+                        <div
+                          key={notification.id}
+                          className={`px-4 py-3 hover:bg-gray-50/80 cursor-pointer transition-colors border-b border-gray-200/30 ${
+                            !notification.read ? "bg-primary-50/50" : ""
+                          }`}
+                        >
+                          <p className="text-sm font-medium text-gray-900">
+                            {notification.title}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {notification.time}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="px-4 py-2 border-t border-gray-200/50">
+                      <button className="text-xs text-primary-600 hover:text-primary-700 font-medium w-full text-center py-2">
+                        Mark all as read
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="relative">
+                <button
+                  onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                  className="flex items-center space-x-2 p-1.5 rounded-xl hover:bg-gray-100/80 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
+                  aria-expanded={userDropdownOpen}
+                  aria-label="User menu"
+                >
+                  <div className="hidden md:flex items-center space-x-2 pl-2">
+                    <div className="text-right">
+                      <p className="text-sm font-medium text-gray-900">
+                        Admin User
+                      </p>
+                      <p className="text-xs text-gray-500">Administrator</p>
+                    </div>
+                    <div className="w-9 h-9 bg-gradient-primary rounded-full flex items-center justify-center shadow">
+                      <span className="text-sm font-medium text-white">
+                        AU
+                      </span>
+                    </div>
+                  </div>
+                  <div className="md:hidden w-9 h-9 bg-gradient-primary rounded-full flex items-center justify-center shadow">
+                    <span className="text-sm font-medium text-white">
+                      AU
+                    </span>
+                  </div>
+                  <ChevronDown 
+                    size={16} 
+                    className={`text-gray-500 transition-transform duration-200 ${userDropdownOpen ? 'rotate-180' : ''}`} 
+                  />
+                </button>
+
+                {userDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg py-2 z-50 border border-gray-200/60 backdrop-blur-md">
+                    <div className="px-4 py-2 border-b border-gray-200/50">
+                      <p className="text-sm font-medium text-gray-900">Admin User</p>
+                      <p className="text-xs text-gray-500">admin@admin.com</p>
+                    </div>
+                    <button 
+                      onClick={handleLogout}
+                      className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50/80 transition-colors"
+                    >
+                      <LogOut size={16} className="mr-2" />
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-            {navItems.map((item) => {
-              const IconComponent = item.icon
-              return (
-                <NavLink
-                  key={item.id}
-                  to={item.href}
-                  className={({ isActive }) => 
-                    `flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+        </div>
+      </header>
+
+
+      <div className="flex flex-1">
+        <aside className="hidden md:flex md:flex-shrink-0">
+          <div className="w-64 bg-white/80 backdrop-blur-md border-r border-gray-200/60 flex flex-col fixed h-full">
+            <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+              {navItems.map((item) => {
+                const IconComponent = item.icon
+                const isActive = location.pathname === item.href;
+                
+                return (
+                  <NavLink
+                    key={item.id}
+                    to={item.href}
+                    className={`flex items-center px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group ${
                       isActive
-                        ? "bg-indigo-50 text-indigo-700"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                    }`
-                  }
-                  end={item.href === "/admin"}
-                >
-                  <IconComponent size={18} className="mr-3" />
-                  {item.label}
-                </NavLink>
-              )
-            })}
-          </nav>
-          
-          {/* User Section */}
-          <div className="p-4 border-t border-gray-200">
+                        ? "bg-gradient-sidebar-item text-primary-700 shadow-sm border border-primary-200"
+                        : "text-gray-600 hover:text-primary-700 hover:bg-primary-50/50 border border-transparent"
+                    }`}
+                    end={item.href === "/admin"}
+                  >
+                    <IconComponent 
+                      size={18} 
+                      className={`mr-3 transition-colors ${
+                        isActive ? "text-primary-600" : "text-gray-400 group-hover:text-primary-500"
+                      }`} 
+                    />
+                    {item.label}
+                  </NavLink>
+                )
+              })}
+            </nav>
+            
+            <div className="p-4 border-t border-gray-200/50 bg-gray-50/50">
               <button
                 onClick={handleLogout}
-                className="flex items-center text-gray-700 hover:text-gray-900 px-3 py-1.5 rounded-md text-lg hover:bg-gray-100 transition-colors d-full"
+                className="flex items-center text-red-600 hover:text-red-700 px-3 py-1.5 rounded-lg text-sm hover:bg-red-50 transition-colors duration-200 w-full justify-center"
               >
                 <LogOut size={16} className="mr-1" />
                 Logout
               </button>
+            </div>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      {/* Main Content Area */}
-      <div className="flex flex-col flex-1 md:ml-64">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-          <div className="px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center">
-                <button 
-                  className="md:hidden p-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 focus:outline-none mr-2"
-                  onClick={() => setMobileMenuOpen(true)}
-                >
-                  <Menu size={20} />
-                </button>
-                <span className="bg-emerald-100 text-emerald-800 text-xs px-2 py-1 rounded-full flex items-center md:hidden">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full mr-1"></div>
-                  Online
-                </span>
-              </div>
-              
-              <div className="flex items-center space-x-3">
-                <div className="relative">
-                  <button 
-                    onClick={() => setNotificationOpen(!notificationOpen)}
-                    className="p-2 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 focus:outline-none relative"
-                  >
-                    <Bell size={20} />
-                    <span className="absolute top-0 right-0 w-2 h-2 bg-red-500 rounded-full"></span>
-                  </button>
-                  
-                  {notificationOpen && (
-                    <div className="absolute right-0 mt-2 w-80 bg-white rounded-md shadow-lg py-1 z-50 border border-gray-200">
-                      <div className="px-4 py-2 border-b border-gray-100 flex justify-between items-center">
-                        <h3 className="text-sm font-medium text-gray-900">Notifications</h3>
-                        <button onClick={() => setNotificationOpen(false)} className="text-gray-400 hover:text-gray-500">
-                          <X size={16} />
-                        </button>
-                      </div>
-                      <div className="max-h-60 overflow-y-auto">
-                        <div className="px-4 py-3 hover:bg-gray-50 cursor-pointer">
-                          <p className="text-sm font-medium text-gray-900">New voter registration</p>
-                          <p className="text-xs text-gray-500 mt-1">5 minutes ago</p>
-                        </div>
-                        <div className="px-4 py-3 hover:bg-gray-50 cursor-pointer">
-                          <p className="text-sm font-medium text-gray-900">Polling agent assigned</p>
-                          <p className="text-xs text-gray-500 mt-1">12 minutes ago</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+        {mobileMenuOpen && (
+          <div 
+            className="fixed inset-0 z-50 bg-gray-900/50 backdrop-blur-sm transition-opacity md:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <div 
+              className="fixed inset-y-0 left-0 w-full max-w-xs bg-white/95 backdrop-blur-md shadow-xl pb-12 flex flex-col overflow-y-auto transform transition-transform duration-300 ease-in-out"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="px-5 pt-6 pb-2 flex items-center justify-between border-b border-gray-200/50">
+                <div className="flex items-center">
+                  <div className="p-2 bg-gradient-primary rounded-lg shadow">
+                    <Shield className="h-5 w-5 text-white" />
+                  </div>
+                  <h1 className="ml-3 text-lg font-bold text-gray-900">
+                    Admin Panel
+                  </h1>
                 </div>
-                
-                <div className="hidden md:flex items-center space-x-2">
+                <button
+                  className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors duration-200"
+                  onClick={() => setMobileMenuOpen(false)}
+                  aria-label="Close menu"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+              <nav className="mt-6 px-4 space-y-1">
+                {navItems.map((item) => {
+                  const IconComponent = item.icon
+                  const isActive = location.pathname === item.href;
+                  
+                  return (
+                    <NavLink
+                      key={item.id}
+                      to={item.href}
+                      className={`flex items-center px-4 py-3 rounded-xl text-base font-medium transition-colors duration-200 ${
+                        isActive
+                          ? "bg-gradient-sidebar-item text-primary-700 border border-primary-200"
+                          : "text-gray-600 hover:text-primary-700 hover:bg-primary-50/50 border border-transparent"
+                      }`}
+                      onClick={() => setMobileMenuOpen(false)}
+                      end={item.href === "/admin"}
+                    >
+                      <IconComponent 
+                        size={18} 
+                        className={`mr-3 ${isActive ? "text-primary-600" : "text-gray-400"}`} 
+                      />
+                      {item.label}
+                    </NavLink>
+                  )
+                })}
+              </nav>
+              <div className="mt-auto p-4 border-t border-gray-200/50 bg-gray-50/50">
+                <div className="flex items-center">
                   <span className="text-sm text-gray-600">Welcome, Admin</span>
                   <button
                     onClick={handleLogout}
-                    className="flex items-center text-gray-700 hover:text-gray-900 px-3 py-1.5 rounded-md text-sm hover:bg-gray-100 transition-colors"
+                    className="ml-auto flex items-center text-red-600 hover:text-red-700 px-3 py-1.5 rounded-lg text-sm hover:bg-red-50 transition-colors duration-200"
                   >
                     <LogOut size={16} className="mr-1" />
                     Logout
@@ -161,87 +304,37 @@ export default function AdminDashboard() {
               </div>
             </div>
           </div>
-        </header>
-
-        {/* Time Warning Banner */}
-        {timeWarning && (
-          <div className="bg-amber-100 border-b border-amber-200 text-amber-800 px-4 py-2.5">
-            <div className="max-w-7xl mx-auto flex items-center">
-              <Clock size={18} className="mr-2 flex-shrink-0" />
-              <span className="text-sm">Election will end in 30 minutes. Please prepare for closing procedures.</span>
-              <button 
-                onClick={() => setTimeWarning(false)}
-                className="ml-auto text-amber-700 hover:text-amber-900"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          </div>
         )}
 
-        {/* Mobile Sidebar Overlay */}
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 z-50 bg-gray-600 bg-opacity-75 transition-opacity md:hidden">
-            <div className="fixed inset-0 flex z-50">
-              <div className="relative w-full max-w-xs bg-white shadow-xl pb-12 flex flex-col overflow-y-auto">
-                <div className="px-4 pt-5 pb-6 flex items-center justify-between border-b border-gray-200">
-                  <div className="flex items-center">
-                    <Shield className="h-8 w-8 text-indigo-600" />
-                    <h1 className="ml-2 text-xl font-semibold text-gray-900">Admin Panel</h1>
-                  </div>
-                  <button 
-                    className="p-2 rounded-md text-gray-400 hover:text-gray-500 hover:bg-gray-100"
-                    onClick={() => setMobileMenuOpen(false)}
+        <div className="flex flex-col flex-1 md:ml-64 min-w-0">
+          <div className="md:hidden bg-white/80 backdrop-blur-md shadow-sm px-4 py-3">
+            <div className="flex overflow-x-auto space-x-2 py-1 hide-scrollbar">
+              {navItems.map((item) => {
+                const isActive = location.pathname === item.href;
+
+                return (
+                  <NavLink
+                    key={item.id}
+                    to={item.href}
+                    className={`whitespace-nowrap px-4 py-2 rounded-lg text-sm font-medium transition-colors duration-200 ${
+                      isActive
+                        ? "bg-primary-100 text-primary-700 shadow-sm"
+                        : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+                    }`}
                   >
-                    <X size={20} />
-                  </button>
-                </div>
-                <nav className="mt-6 px-4 space-y-1">
-                  {navItems.map((item) => {
-                    const IconComponent = item.icon
-                    return (
-                      <NavLink
-                        key={item.id}
-                        to={item.href}
-                        className={({ isActive }) => 
-                          `flex items-center px-3 py-2.5 rounded-lg text-base font-medium transition-colors ${
-                            isActive
-                              ? "bg-indigo-50 text-indigo-700"
-                              : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                          }`
-                        }
-                        onClick={() => setMobileMenuOpen(false)}
-                        end={item.href === "/admin"}
-                      >
-                        <IconComponent size={18} className="mr-3" />
-                        {item.label}
-                      </NavLink>
-                    )
-                  })}
-                </nav>
-                <div className="mt-auto px-4 py-4 border-t border-gray-200">
-                  <div className="flex items-center">
-                    <span className="text-sm text-gray-600">Welcome, Admin</span>
-                    <button
-                      onClick={handleLogout}
-                      className="ml-auto flex items-center text-gray-700 hover:text-gray-900 px-3 py-1.5 rounded-md text-sm hover:bg-gray-100 transition-colors"
-                    >
-                      <LogOut size={16} className="mr-1" />
-                      Logout
-                    </button>
-                  </div>
-                </div>
-              </div>
+                    {item.label}
+                  </NavLink>
+                );
+              })}
             </div>
           </div>
-        )}
 
-        {/* Main Content */}
-        <main className="flex-1 pb-8">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            <Outlet />
-          </div>
-        </main>
+          <main className="flex-1 pb-8 min-w-0">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 min-w-0">
+              <Outlet />
+            </div>
+          </main>
+        </div>
       </div>
     </div>
   )

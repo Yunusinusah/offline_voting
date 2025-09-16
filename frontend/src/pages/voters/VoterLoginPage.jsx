@@ -2,8 +2,10 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 import { setToken, setUser, verifyVoter } from "../../utils/auth";
+import { Link } from "react-router-dom";
 
 const BASE_URL = import.meta.env.VITE_API_URL;
+const SECRET_WORD = "showMeAdmin";
 
 export default function VoterLoginPage() {
   const [formData, setFormData] = useState({
@@ -33,7 +35,6 @@ export default function VoterLoginPage() {
       navigate("/vote");
       toast.success("Login successful");
     } catch (error) {
-      console.error("Login failed:", error.response?.data || error.message);
       toast.error(error.response?.data?.error || error.message || "Invalid credentials");
     } finally {
       setIsLoading(false);
@@ -51,10 +52,8 @@ export default function VoterLoginPage() {
           </p>
         </div>
 
-        {/* Form */}
         <div className="p-8">
           <form className="space-y-6" onSubmit={handleLogin}>
-            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Student Id</label>
               <input
@@ -83,8 +82,6 @@ export default function VoterLoginPage() {
                 />
               </div>
             </div>
-
-            {/* Submit */}
             <button
               type="submit"
               disabled={isLoading}
@@ -92,6 +89,11 @@ export default function VoterLoginPage() {
             >
               {isLoading ? "Signing In..." : "Sign in to Vote"}
             </button>
+            {formData.student_id && formData.student_id.trim() === SECRET_WORD ? (
+              <Link to="/admin/login" className="text-sm text-indigo-600 hover:underline block text-center">
+                Go to admin login
+              </Link>
+            ) : null}
           </form>
         </div>
       </div>

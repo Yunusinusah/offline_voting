@@ -1,16 +1,19 @@
 import React, { useState } from "react";
 import { toast } from "react-toastify";
 import api from "../../utils/api";
-import { getUser } from "../../utils/auth";
+import { getUser, logout } from "../../utils/auth";
+import { useNavigate } from "react-router-dom";
 
 export default function GenerateVoterPassword() {
-  const [studentId, setStudentId] = useState("");
+  const [student_id, setStudentId] = useState("");
   const [otp, setOtp] = useState(null);
   const [voter, setVoter] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const naviagate = useNavigate();
+
   const handleSearch = async () => {
-    if (!studentId) {
+    if (!student_id) {
       toast.error("Please enter a Student ID");
       return;
     }
@@ -27,26 +30,19 @@ export default function GenerateVoterPassword() {
         return;
       }
 
-      const response = await api.post(`/api/auth/generate-otp/${studentId}/`);
+      const response = await api.post(`/auth/voter/generate/`, {student_id});
       if (response.status === 200) {
         const { otp: generatedOtp, voter_id } = response.data;
-        setVoter({ student_id: voter_id || studentId });
+        setVoter({ student_id: voter_id || student_id });
         setOtp(generatedOtp || null);
         toast.success("OTP generated successfully");
       } else {
         toast.error("Failed to generate OTP");
       }
-    } catch (error) {
-      console.error(error);
+    } catch(error) {
       toast.error(error.response?.data?.error || "Error generating password");
     } finally {
       setLoading(false);
-    }
-  };
-  const handleCopy = () => {
-    if (otp) {
-      navigator.clipboard.writeText(otp);
-      toast.info("Password copied to clipboard!");
     }
   };
 
@@ -58,6 +54,11 @@ export default function GenerateVoterPassword() {
           <h2 className="text-2xl font-bold text-center">
             Generate Voter Password
           </h2>
+          <button className="absolute top-4 right-4 text-white bg-red-600 boarder-radius-2 p-2 hover:text-gray-200" onClick={() => {
+           logout();
+          }}>
+            Logout
+          </button>
           <p className="text-center text-blue-100 mt-1 text-sm">
             Create secure passwords for student voters
           </p>
@@ -74,7 +75,7 @@ export default function GenerateVoterPassword() {
                 type="text"
                 placeholder="Enter Student ID"
                 className="flex-1 border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                value={studentId}
+                value={student_id}
                 onChange={(e) => setStudentId(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSearch()}
               />
@@ -158,26 +159,7 @@ export default function GenerateVoterPassword() {
                     <p className="font-mono font-bold text-green-700 text-lg tracking-wide">
                       {otp}
                     </p>
-                    <button
-                      onClick={handleCopy}
-                      className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg hover:bg-blue-200 transition-colors duration-200 flex items-center"
-                    >
-                      <svg
-                        className="w-4 h-4 mr-1"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth="2"
-                          d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
-                        ></path>
-                      </svg>
-                      Copy
-                    </button>
+                    
                   </div>
                 </div>
               </div>

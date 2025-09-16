@@ -3,9 +3,16 @@ module.exports = (sequelize, DataTypes) => {
   const Voter = sequelize.define('Voter', {
     id: { type: DataTypes.INTEGER.UNSIGNED, primaryKey: true, autoIncrement: true },
     student_id: { type: DataTypes.STRING(100), allowNull: false, unique: true },
-  password: { type: DataTypes.STRING(255), allowNull: true },
+    name: { type: DataTypes.STRING(200) },
+    email: {
+      type: DataTypes.STRING(200),
+      unique: true,
+      validate: { isEmail: true },
+    },
+    password: { type: DataTypes.STRING(255), allowNull: true },
     level: { type: DataTypes.STRING(50) },
-    gender: { type: DataTypes.ENUM('male','female','other') },
+    gender: { type: DataTypes.ENUM('male', 'female', 'other') },
+    has_voted: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
     election_id: { type: DataTypes.INTEGER.UNSIGNED }
   }, {
     tableName: 'voters',

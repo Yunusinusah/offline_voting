@@ -1,7 +1,7 @@
 import axios from "axios";
 import { toast } from "react-toastify";
-
-const API_BASE_URL = import.meta.env.VITE_API_URL ||  "";
+import { logout } from "../utils/auth";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "";
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -20,13 +20,13 @@ api.interceptors.request.use(
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  () => Promise.reject()
 );
 
-// Response: centralized user-friendly messages + session expiry handling
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    const status = error.response?.status;
     const message =
       error.response?.data?.non_field_errors ||
       error.response?.data?.error ||
@@ -35,26 +35,19 @@ api.interceptors.response.use(
 
     const url = error.config?.url || "";
 
-    const isAuthRoute = url.includes("/api/auth/admin/login") || url.includes("/api/auth/voter/verify") || url.includes("/api/auth/voter/generate");
+    const isAuthRoute =
+      url.includes("/api/auth/admin/login") ||
+      url.includes("/api/auth/voter/verify") ||
+      url.includes("/api/auth/voter/generate");
 
-    if (!isAuthRoute) {
-      // if (error.response?.status === 401) {
-      //   localStorage.removeItem("election_token");
-      //   localStorage.removeItem("user");
-      //   // send to root (default voter login) by default
-      //   window.location.href = "/";
-      //   toast.error("Session expired. Please login again.");
-      // // } else if (error.response?.status === 403) {
-      // //   toast.error("Access forbidden. You do not have permission.");
-      // // } else if (error.response?.status === 404) {
-      // //   toast.error("Resource not found.");
-      // // } else if (error.response?.status >= 500) {
-      // //   toast.error("Server error. Please try again later.");
-      // } else {
-      //   toast.error(message);
-      // }
-    } else {
-      // for auth routes show the specific error
+    // 🛑 Handle 401 Unauthorized globally
+    if (status === 401 && !isAuthRoute) {
+      logout();
+      toast.error("Session expired. Please log in again.");
+      return
+    }
+
+    if (isAuthRoute) {
       toast.error(message);
     }
 
@@ -62,4 +55,40 @@ api.interceptors.response.use(
   }
 );
 
+
 export default api;
+
+export function getBackendOrigin() {
+  if (!API_BASE_URL) return "";
+  try {
+    const url = new URL(API_BASE_URL, window.location.origin);
+    let pathname = url.pathname.replace(/\/+/g, "/");
+    if (pathname.endsWith("/api")) pathname = pathname.slice(0, -4) || "/";
+    const origin = `${url.protocol}//${url.host}`;
+    return origin + (pathname === "/" ? "" : pathname);
+  } catch {
+    let v = API_BASE_URL.replace(/\/+$/, "");
+    if (v.endsWith("/api")) v = v.slice(0, -4);
+    return v;
+  }
+}
+
+export function getUploadUrl(uploadPath) {
+  if (!uploadPath) return "";
+  try {
+    const maybeAbs = new URL(uploadPath, window.location.origin);
+    if (maybeAbs.protocol && maybeAbs.host && !uploadPath.startsWith("/")) {
+      return uploadPath;
+    }
+  } catch {
+    // ignore
+  }
+
+  const origin = getBackendOrigin() || "";
+
+  // If uploadPath already starts with a leading slash, just concat to origin
+  if (uploadPath.startsWith("/")) return `${origin}${uploadPath}`;
+
+  // Otherwise ensure slash between origin and path
+  return `${origin}/${uploadPath}`;
+}

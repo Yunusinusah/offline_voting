@@ -7,10 +7,10 @@ const router = express.Router();
 // Admin login
 router.post('/admin/login', authController.adminLogin);
 
-// Generate OTP for voter (requires polling agent or admin) - here we gate to polling_agent and admin
-router.post('/voter/generate', authenticate, authorize(['polling_agent', 'admin', 'superadmin']), authController.generateVoterOTP);
+// Generate OTP for voter 
+router.post('/voter/generate', authenticate, authorize(['polling_agent']), authController.generateVoterOTP);
 
-// Verify OTP (voter flow)
+// Voter Login
 router.post('/voter/verify', authController.verifyVoterOTP);
 
 module.exports = router;
