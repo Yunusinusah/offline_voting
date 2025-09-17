@@ -9,7 +9,16 @@ module.exports = (sequelize, DataTypes) => {
       },
       user_id: { type: DataTypes.INTEGER },
       voter_id: { type: DataTypes.INTEGER },
-      action: { type: DataTypes.STRING(128) },
+      action: {
+        type: DataTypes.ENUM(
+          "cast_vote",
+          "login",
+          "generate_token",
+          "update",
+          "delete",
+          "create"
+        ),
+      },
       ip_address: { type: DataTypes.STRING(64) },
       details: { type: DataTypes.TEXT },
     },
