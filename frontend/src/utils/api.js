@@ -31,15 +31,15 @@ api.interceptors.response.use(
       error.response?.data?.non_field_errors ||
       error.response?.data?.error ||
       error.response?.data?.detail ||
+      error.message ||
       "An error occurred";
 
     const url = error.config?.url || "";
 
     const isAuthRoute =
-      url.includes("/api/auth/admin/login") ||
-      url.includes("/api/auth/voter/verify") ||
-      url.includes("/api/auth/voter/generate");
-
+      url.includes("auth/admin/login") ||
+      url.includes("auth/voter/verify") ||
+      url.includes("auth/voter/generate");
     // 🛑 Handle 401 Unauthorized globally
     if (status === 401 && !isAuthRoute) {
       logout();
