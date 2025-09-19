@@ -32,11 +32,14 @@ async function checkAndToggleElections(logger = console) {
       }
     }
 
-    // Deactivate elections that have ended but are still active
+    // Deactivate elections that have ended but are still active or start_time in future
     const toDeactivate = await models.Election.findAll({
       where: {
         is_active: true,
-        end_time: { [Op.lte]: now }
+        [Op.or]: {
+          end_time: { [Op.lte]: now },
+          start_time: { [Op.gt]: now },
+        }
       }
     });
 

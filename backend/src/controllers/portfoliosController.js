@@ -24,6 +24,7 @@ exports.create = async (req, res) => {
       restriction_details: restriction_details || null,
     });
     const json = p.toJSON();
+  try { await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'create', details: `portfolio ${p.id} created` }); } catch (e) { /* best effort */ }
     // maintain backward compatibility fields used by frontend
     json.voting_restriction =
       json.restriction_type === "NONE" ? "general" : json.restriction_type;
@@ -82,6 +83,7 @@ exports.update = async (req, res) => {
     });
     await models.Portfolio.update(payload, { where: { id: req.params.id } });
     const p = await models.Portfolio.findByPk(req.params.id);
+  try { await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'update', details: `portfolio ${req.params.id} updated` }); } catch (e) { /* best effort */ }
     const json = p.toJSON();
     json.voting_restriction =
       json.restriction_type === "NONE" ? "general" : json.restriction_type;
@@ -96,6 +98,7 @@ exports.remove = async (req, res) => {
   try {
   if (!models) throw new Error('ORM not initialized');
   await models.Portfolio.destroy({ where: { id: req.params.id } });
+  try { await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'delete', details: `portfolio ${req.params.id} deleted` }); } catch (e) { /* best effort */ }
   res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

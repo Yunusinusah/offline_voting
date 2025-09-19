@@ -20,6 +20,12 @@ exports.adminLogin = async (req, res) => {
     if(user.role === "admin" || user.role=="polling_agent") {
       if (!user.election_id) return res.status(500).json({ error: "You are not assigned an election, contact Super admin"})
     }
+    // Log admin login
+    try {
+      await models.Log.create({ user_id: user.id, action: 'login', ip_address: req.ip || null, details: `user ${user.id} login` });
+    } catch (e) {
+      console.warn('Failed to record login log', e.message || e);
+    }
     res.json({ token, role: user.role });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -37,6 +43,12 @@ exports.generateVoterOTP = async (req, res) => {
     if (voter.has_voted)      return res.status(400).json({ error: "voter has already voted" });
     const otp = await generateOTP(voter.id);
     // For offline use, we return the OTP code in response so the polling agent can show it to the voter.
+    // Log OTP generation
+    try {
+      await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, voter_id: voter.id, action: 'generate_token', details: `OTP ${otp.id} generated for voter ${voter.id}` });
+    } catch (e) {
+      console.warn('Failed to record generate_token log', e.message || e);
+    }
     res.json({ otp: otp.code, expires_at: otp.expires_at });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -70,6 +82,12 @@ exports.verifyVoterOTP = async (req, res) => {
       JWT_SECRET,
       { expiresIn: "2h" }
     );
+    // Log that a voter token was generated
+    try {
+      await models.Log.create({ voter_id: voter.id, action: 'generate_token', details: `voter token issued (otp ${otp.id})` });
+    } catch (e) {
+      console.warn('Failed to record generate_token log', e.message || e);
+    }
     res.json({ token });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -93,6 +111,9 @@ exports.createAdmin = async (req, res) => {
       role: "admin",
       election_id: election_id || null,
     });
+    try {
+      await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'create', details: `admin ${user.id} created` });
+    } catch (e) { console.warn('Failed to record create admin log', e.message || e); }
     res.status(201).json({
       id: user.id,
       username: user.username,
@@ -175,6 +196,9 @@ exports.createPollingAgent = async (req, res) => {
       email: email,
       election_id: req.full_user.election_id || null,
     });
+    try {
+      await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'create', details: `polling_agent ${user.id} created` });
+    } catch (e) { console.warn('Failed to record create polling_agent log', e.message || e); }
     res
       .status(201)
       .json({ id: user.id, username: user.username,email: user.email, role: user.role });
@@ -201,6 +225,9 @@ exports.createVoter = async (req, res) => {
       gender: gender || null,
       election_id: election_id || null,
     });
+    try {
+      await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, voter_id: voter.id, action: 'create', details: `voter ${voter.id} created` });
+    } catch (e) { console.warn('Failed to record create voter log', e.message || e); }
     res.status(201).json({ id: voter.id, student_id: voter.student_id });
   } catch (err) {
     res.status(500).json({ error: err.message });

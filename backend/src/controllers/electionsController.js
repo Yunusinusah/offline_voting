@@ -4,17 +4,15 @@ const models = orm ? orm.models : null;
 
 exports.create = async (req, res) => {
   try {
-    const { user } = await req.full_user;
-
     const {
       title,
       start_time,
       end_time,
       allow_under_voting,
     } = req.body;
-
     const start = start_time ? new Date(start_time) : null;
     const end = end_time ? new Date(end_time) : null;
+    const serverCurrentTime = new Date();
     if (!start || !end || isNaN(start.getTime()) || isNaN(end.getTime())) {
       return res
         .status(400)
@@ -23,12 +21,17 @@ exports.create = async (req, res) => {
     if (start.getTime() > end.getTime()) {
       return res
         .status(400)
-        .json({ error: "start_time must not be after end_time" });
+        .json({ error: "Start time must not be after end_time" });
+    }
+    // also add that start time must be after current time
+    if (start.getTime() <= serverCurrentTime.getTime()) {
+      return res
+        .status(400)
+        .json({ error: "Start time must be in the future" });
     }
 
     if (!models) throw new Error("ORM not initialized");
 
-    const serverCurrentTime = new Date();
     const is_active =
       start.getTime() <= serverCurrentTime.getTime() &&
       end.getTime() >= serverCurrentTime.getTime();
@@ -42,9 +45,10 @@ exports.create = async (req, res) => {
       allow_under_voting:
         allow_under_voting === undefined ? true : !!allow_under_voting,
     });
-  const ejson = election.toJSON();
-  ejson.server_time = new Date();
-  res.status(201).json(ejson);
+    const ejson = election.toJSON();
+    ejson.server_time = new Date();
+    try { await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'create', details: `election ${election.id} created` }); } catch (e) { /* best effort */ }
+    res.status(201).json(ejson);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -59,7 +63,7 @@ exports.list = async (req, res) => {
       electionJson.server_time = new Date();
       return electionJson;
     });
-  res.json(electionsWithServerTime);
+    res.json(electionsWithServerTime);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -74,10 +78,10 @@ exports.get = async (req, res) => {
 
     if (!models) throw new Error("ORM not initialized");
     const election = await models.Election.findByPk(req.params.id);
-  if (!election) return res.status(404).json({ error: "not found" });
-  const getJson = election.toJSON();
-  getJson.server_time = new Date();
-  res.json(getJson);
+    if (!election) return res.status(404).json({ error: "not found" });
+    const getJson = election.toJSON();
+    getJson.server_time = new Date();
+    res.json(getJson);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -93,10 +97,10 @@ exports.myElection = async (req, res) => {
     }
     if (!models) throw new Error("ORM not initialized");
     const election = await models.Election.findByPk(user_details.election_id);
-  if (!election) return res.status(404).json({ error: "not found" });
-  const myJson = election.toJSON();
-  myJson.server_time = new Date();
-  res.json(myJson);
+    if (!election) return res.status(404).json({ error: "not found" });
+    const myJson = election.toJSON();
+    myJson.server_time = new Date();
+    res.json(myJson);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -131,10 +135,11 @@ exports.update = async (req, res) => {
     }
 
     await models.Election.update(changes, { where: { id: req.params.id } });
-  const election = await models.Election.findByPk(req.params.id);
-  const upJson = election.toJSON();
-  upJson.server_time = new Date();
-  res.json(upJson);
+    const election = await models.Election.findByPk(req.params.id);
+    const upJson = election.toJSON();
+    upJson.server_time = new Date();
+    try { await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'update', details: `election ${req.params.id} updated` }); } catch (e) { /* best effort */ }
+    res.json(upJson);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -171,6 +176,7 @@ exports.adjustEndTime = async (req, res) => {
     const updated = await models.Election.findByPk(electionId);
     const json = updated.toJSON();
     json.server_time = new Date();
+    try { await models.Log.create({ user_id: fullUser && fullUser.id ? fullUser.id : null, action: 'update', details: `election ${electionId} end_time adjusted to ${newEnd.toISOString()}` }); } catch (e) { /* best effort */ }
     res.json(json);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -185,6 +191,7 @@ exports.remove = async (req, res) => {
       const election = await models.Election.findByPk(req.params.id, { transaction: trx });
       if (!election) return res.status(404).json({ error: 'not found' });
       await election.destroy({ transaction: trx });
+      try { await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'delete', details: `election ${req.params.id} deleted` }); } catch (e) { /* best effort */ }
       res.json({ ok: true });
     });
   } catch (err) {

@@ -155,6 +155,7 @@ exports.upload = async (req, res) => {
               { transaction: trx }
             );
             updatedCount++;
+                  // try { await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, voter_id: existing.id, action: 'update', details: `voter ${existing.id} updated via bulk upload` }, { transaction: trx }); } catch (e) { /* best effort */ }
           } else {
             await models.Voter.create(
               {
@@ -170,6 +171,7 @@ exports.upload = async (req, res) => {
             );
             insertedCount++;
           }
+          try { await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'create', details: `voter ${existing ? 'updated' : 'created'} via bulk upload` }, { transaction: trx }); } catch (e) { /* best effort */ }
         } catch (dbError) {
           throw new Error(
             `Database error for student_id ${v.student_id}: ${dbError.message}`

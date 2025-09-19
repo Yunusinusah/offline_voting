@@ -12,11 +12,11 @@ async function castVote({ voterId, electionId, votes }) {
     if (!voter)
       throw new Error("voter not found or not registered for this election");
 
-    const prev = await models.Log.findOne({
-      where: { voter_id: voterId, action: "cast_vote" },
-      transaction: trx,
-    });
-    if (prev) throw new Error("voter has already voted");
+    // const prev = await models.Log.findOne({
+    //   where: { voter_id: voterId, action: "cast_vote" },
+    //   transaction: trx,
+    // });
+    // if (prev) throw new Error("voter has already voted");
 
     const election = await models.Election.findByPk(electionId, {
       transaction: trx,

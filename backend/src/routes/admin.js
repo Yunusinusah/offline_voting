@@ -60,7 +60,12 @@ router.delete(
 );
 
 // User management
-router.post("/admin", authController.createAdmin);
+router.post(
+  "/admin",
+  authenticate,
+  authorize(["superadmin"]),
+  authController.createAdmin
+);
 router.get(
   "/admin",
   authenticate,

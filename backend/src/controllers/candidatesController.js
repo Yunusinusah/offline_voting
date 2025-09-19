@@ -14,6 +14,7 @@ exports.create = async (req, res) => {
   if (!models) throw new Error('ORM not initialized');
   const profile_picture = req.file ? `/public/uploads/${req.file.filename}` : null;
   const c = await models.Candidate.create({ portfolio_id, full_name, profile_picture, ballot_num, election_id });
+  try { await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'create', details: `candidate ${c.id} created` }); } catch (e) { /* best effort */ }
   res.status(201).json(c.toJSON());
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -35,6 +36,7 @@ exports.update = async (req, res) => {
   if (req.file) changes.profile_picture = `/public/uploads/${req.file.filename}`;
   await models.Candidate.update(changes, { where: { id: req.params.id } });
   const c = await models.Candidate.findByPk(req.params.id);
+  try { await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'update', details: `candidate ${req.params.id} updated` }); } catch (e) { /* best effort */ }
   res.json(c.toJSON());
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -45,6 +47,7 @@ exports.remove = async (req, res) => {
   try {
   if (!models) throw new Error('ORM not initialized');
   await models.Candidate.destroy({ where: { id: req.params.id } });
+  try { await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'delete', details: `candidate ${req.params.id} deleted` }); } catch (e) { /* best effort */ }
   res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });

@@ -47,6 +47,7 @@ exports.create = async (req, res) => {
 
   const s = await models.Setting.create({ name, theme_color, logo_path, election_id: election_id || null, footer_text: footer_text || null, support_email: support_email || null, is_default: !!is_default }, { transaction: t });
     await t.commit();
+    try { await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'create', details: `setting ${s.id} created` }); } catch (e) { /* best effort */ }
     res.status(201).json(s);
   } catch (err) {
     await t.rollback();
@@ -78,6 +79,7 @@ exports.update = async (req, res) => {
 
     await s.save({ transaction: t });
     await t.commit();
+  try { await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'update', details: `setting ${s.id} updated` }); } catch (e) { /* best effort */ }
     res.json(s);
   } catch (err) {
     await t.rollback();
@@ -91,6 +93,7 @@ exports.remove = async (req, res) => {
     const s = await models.Setting.findByPk(req.params.id);
     if (!s) return res.status(404).json({ error: 'not found' });
     await s.destroy();
+  try { await models.Log.create({ user_id: req.full_user && req.full_user.id ? req.full_user.id : null, action: 'delete', details: `setting ${s.id} deleted` }); } catch (e) { /* best effort */ }
     res.json({ message: 'deleted' });
   } catch (err) {
     res.status(500).json({ error: err.message });
