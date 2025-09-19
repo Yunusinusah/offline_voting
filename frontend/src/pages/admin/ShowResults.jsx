@@ -193,7 +193,7 @@ export default function ShowResults({ params }) {
   } = data || {};
 
   const handlePrint = () => window.print();
-  const handleExport = () => alert('Export functionality to be implemented');
+  // const handleExport = () => alert('Export functionality to be implemented');
 
   return (
     <div className="min-h-screen p-6 bg-gradient-to-b from-gray-50 to-white">
@@ -230,12 +230,12 @@ export default function ShowResults({ params }) {
               </svg>
               Print
             </button>
-            <button 
+            {/* <button 
               onClick={handleExport}
               className="inline-flex items-center gap-2 border border-gray-300 hover:border-gray-400 px-4 py-2 rounded-lg bg-white text-gray-700 hover:bg-gray-50 transition-colors"
             >
               Export
-            </button>
+            </button> */}
           </div>
         </div>
 

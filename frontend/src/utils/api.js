@@ -44,7 +44,8 @@ api.interceptors.response.use(
     if (status === 401 && !isAuthRoute) {
       logout();
       toast.error("Session expired. Please log in again.");
-      return
+      window.location.reload();
+      return;
     }
 
     if (isAuthRoute) {

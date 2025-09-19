@@ -60,7 +60,6 @@ export async function generateVoterOTP({ student_id }) {
 
 export function logout() {
   clearAuth();
-  window.location.href = "/";
 }
 
 export function getCurrentUser() {

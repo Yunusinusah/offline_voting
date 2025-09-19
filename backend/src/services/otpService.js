@@ -44,11 +44,6 @@ async function verifyOTP(voterId, code) {
   });
   if (!otp) return false;
 
-  await models.Log.create({ 
-    voter_id: voterId, 
-    action: 'verify_otp', 
-    details: `OTP ${otp.id} validated for login` 
-  });
 
   return otp;
 }

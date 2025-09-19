@@ -11,7 +11,6 @@ export default function Login() {
 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  // api client will use VITE_API_URL as its base
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -41,8 +40,9 @@ export default function Login() {
       else navigate("/");
 
       toast.success("Login successful");
-    } catch (error) {
-      toast.error(error.response?.data?.error || error.message || "Invalid credentials or server error");
+    } catch {
+    // } catch (error) {
+      // (error.response?.data?.error || error.message || "Invalid credentials or server error");
     } finally {
       setIsLoading(false);
     }

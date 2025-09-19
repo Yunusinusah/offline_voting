@@ -34,8 +34,9 @@ export default function VoterLoginPage() {
       setUser({ role: role || 'voter', voter_id: formData.student_id, ...(user || {}) });
       navigate("/vote");
       toast.success("Login successful");
-    } catch (error) {
-      toast.error(error.response?.data?.error || error.message || "Invalid credentials");
+    } catch {
+    // } catch (error) {
+      // toast.error(error.response?.data?.error || error.message || "Invalid credentials");
     } finally {
       setIsLoading(false);
     }

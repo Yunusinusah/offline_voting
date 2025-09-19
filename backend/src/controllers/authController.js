@@ -84,7 +84,7 @@ exports.verifyVoterOTP = async (req, res) => {
     );
     // Log that a voter token was generated
     try {
-      await models.Log.create({ voter_id: voter.id, action: 'generate_token', details: `voter token issued (otp ${otp.id})` });
+      await models.Log.create({ voter_id: voter.id, action: 'login', details: `voter ${voter.id} logged in with (otp ${otp.id})` });
     } catch (e) {
       console.warn('Failed to record generate_token log', e.message || e);
     }
