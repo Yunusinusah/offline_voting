@@ -16,7 +16,8 @@ module.exports = (sequelize, DataTypes) => {
           "generate_token",
           "update",
           "delete",
-          "create"
+          "create",
+          "verify_otp"
         ),
       },
       ip_address: { type: DataTypes.STRING(64) },
